@@ -1,0 +1,301 @@
+---
+title: "feature-weighted_elasticNet"
+author: "Yutong Lu"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(fwelnet)
+library(tidyverse)
+library(Metrics)
+```
+
+# load split-1 data
+
+```{r}
+# import data from split-1
+split1_X_valid2 <- as.matrix(read.csv('../split-1/processed_data/ablation/lipo_X_ensemble_valid2_scaled_molformer+molbert_rawres.csv'))
+split1_y_valid2 <- as.matrix(read.csv('../split-1/processed_data/ablation/lipo_y_ensemble_valid2_molformer+molbert.csv'))
+
+split1_X_test <- as.matrix(read.csv('../split-1/processed_data/ablation/lipo_X_ensemble_test_scaled_molformer+molbert_rawres.csv'))
+split1_y_test <- as.matrix(read.csv('../split-1/processed_data/ablation/lipo_y_ensemble_test_molformer+molbert.csv'))
+
+# Define mean and standard deviation from training set
+train_mean1 <- 2.1741626984126983
+train_sd1 <- 1.2060271152247222
+```
+
+# two groups
+
+```{r}
+set.seed(0)
+p <- 1538
+groups2 <- list(1:2, 3:1538)
+
+# generate Z matrix
+z2 <- matrix(0, nrow = p, ncol = length(groups2))
+for (i in 1:length(groups2)) {
+    z2[groups2[[i]], i] <- 1
+}
+
+cvfit2 <- cv.fwelnet(split1_X_valid2, split1_y_valid2, z2, nfolds = 5)
+plot(cvfit2)
+
+cvfit2$lambda.min # value of lambda that gives minimum cross-validated error
+cvfit2$lambda.1se # largest value of lambda such that the CV error is within one standard error of the minimum
+
+split1_preds_test2 <- predict(cvfit2, split1_X_test) * train_sd1 + train_mean1  # s = lambda.1se
+
+# Calculate Mean Absolute Error (MAE)
+mae_value <- mae(actual = split1_y_test, predicted = split1_preds_test2)
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse_value <- rmse(actual = split1_y_test, predicted = split1_preds_test2)
+
+# Calculate R-squared
+r2_value <- summary(lm(split1_y_test~split1_preds_test2))$r.squared
+
+# Calculate correlation
+correlation_value <- cor(split1_y_test, split1_preds_test2)
+
+# Print the results
+print(paste("MAE:", mae_value))
+print(paste("RMSE:", rmse_value))
+print(paste("R2:", r2_value))
+print(paste("Correlation:", correlation_value))
+```
+
+# three groups
+
+```{r}
+set.seed(0)
+
+p <- 1538
+groups3 <- list(1:2, 3:770, 771:1538)  # which features belong to which group
+
+# generate Z matrix
+z3 <- matrix(0, nrow = p, ncol = length(groups3))
+for (i in 1:length(groups)) {
+    z3[groups3[[i]], i] <- 1
+}
+
+cvfit3 <- cv.fwelnet(split1_X_valid2, split1_y_valid2, z3, nfolds = 5)
+plot(cvfit3)
+
+cvfit3$lambda.min # value of lambda that gives minimum cross-validated error
+cvfit3$lambda.1se # largest value of lambda such that the CV error is within one standard error of the minimum
+
+split1_preds_test3 <- predict(cvfit3, split1_X_test) * train_sd1 + train_mean1  # s = lambda.1se
+
+# Calculate Mean Absolute Error (MAE)
+mae_value <- mae(actual = split1_y_test, predicted = split1_preds_test3)
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse_value <- rmse(actual = split1_y_test, predicted = split1_preds_test3)
+
+# Calculate R-squared
+r2_value <- summary(lm(split1_y_test~split1_preds_test3))$r.squared
+
+# Calculate correlation
+correlation_value <- cor(split1_y_test, split1_preds_test3)
+
+# Print the results
+print(paste("MAE:", mae_value))
+print(paste("RMSE:", rmse_value))
+print(paste("R2:", r2_value))
+print(paste("Correlation:", correlation_value))
+```
+
+# load split-2 data
+
+```{r}
+# import data from split-2
+split2_X_valid2 <- as.matrix(read.csv('../split-2/processed_data/ablation/lipo_X_ensemble_valid2_scaled_molformer+molbert_rawres.csv'))
+split2_y_valid2 <- as.matrix(read.csv('../split-2/processed_data/ablation/lipo_y_ensemble_valid2_molformer+molbert.csv'))
+
+split2_X_test <- as.matrix(read.csv('../split-2/processed_data/ablation/lipo_X_ensemble_test_scaled_molformer+molbert_rawres.csv'))
+split2_y_test <- as.matrix(read.csv('../split-2/processed_data/ablation/lipo_y_ensemble_test_molformer+molbert.csv'))
+
+# Define mean and standard deviation from training set
+train_mean2 <- 2.1799722222222226
+train_sd2 <- 1.2045431891731355
+```
+
+# two groups
+
+```{r}
+set.seed(0)
+
+p <- 1538
+groups2 <- list(1:2, 3:1538)
+
+# generate Z matrix
+z2 <- matrix(0, nrow = p, ncol = length(groups2))
+for (i in 1:length(groups2)) {
+    z2[groups2[[i]], i] <- 1
+}
+
+cvfit2 <- cv.fwelnet(split2_X_valid2, split2_y_valid2, z2, nfolds = 5)
+plot(cvfit2)
+
+cvfit2$lambda.min
+cvfit2$lambda.1se
+
+split2_preds_test2 <- predict(cvfit2, split2_X_test) * train_sd2 + train_mean2  # s = lambda.1se
+
+# Calculate Mean Absolute Error (MAE)
+mae_value <- mae(actual = split2_y_test, predicted = split2_preds_test2)
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse_value <- rmse(actual = split2_y_test, predicted = split2_preds_test2)
+
+# Calculate R-squared
+r2_value <- summary(lm(split2_y_test ~ split2_preds_test2))$r.squared
+
+# Calculate correlation
+correlation_value <- cor(split2_y_test, split2_preds_test2)
+
+# Print the results
+print(paste("MAE:", mae_value))
+print(paste("RMSE:", rmse_value))
+print(paste("R2:", r2_value))
+print(paste("Correlation:", correlation_value))
+```
+
+# three groups
+
+```{r}
+set.seed(0)
+p <- 1538
+groups3 <- list(1:2, 3:770, 771:1538)  # which features belong to which group
+
+# generate Z matrix
+z3 <- matrix(0, nrow = p, ncol = length(groups3))
+for (i in 1:length(groups)) {
+    z3[groups3[[i]], i] <- 1
+}
+
+cvfit3 <- cv.fwelnet(split2_X_valid2, split2_y_valid2, z3, nfolds = 5)
+plot(cvfit3)
+
+cvfit3$lambda.min
+cvfit3$lambda.1se
+
+split2_preds_test3 <- predict(cvfit3, split2_X_test) * train_sd2 + train_mean2  # s = lambda.1se
+
+# Calculate Mean Absolute Error (MAE)
+mae_value <- mae(actual = split2_y_test, predicted = split2_preds_test3)
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse_value <- rmse(actual = split2_y_test, predicted = split2_preds_test3)
+
+# Calculate R-squared
+r2_value <- summary(lm(split2_y_test ~ split2_preds_test3))$r.squared
+
+# Calculate correlation
+correlation_value <- cor(split2_y_test, split2_preds_test3)
+
+# Print the results
+print(paste("MAE:", mae_value))
+print(paste("RMSE:", rmse_value))
+print(paste("R2:", r2_value))
+print(paste("Correlation:", correlation_value))
+```
+
+# load split-3 data
+
+```{r}
+# Load the training set of meta-model
+split3_X_valid2 <- as.matrix(read.csv('../split-3/processed_data/ablation/lipo_X_ensemble_valid2_scaled_molformer+molbert_rawres.csv'))
+split3_y_valid2 <- as.matrix(read.csv('../split-3/processed_data/ablation/lipo_y_ensemble_valid2_molformer+molbert.csv'))
+
+split3_X_test <- as.matrix(read.csv('../split-3/processed_data/ablation/lipo_X_ensemble_test_scaled_molformer+molbert_rawres.csv'))
+split3_y_test <- as.matrix(read.csv('../split-3/processed_data/ablation/lipo_y_ensemble_test_molformer+molbert.csv'))
+
+# Define mean and standard deviation from training set
+train_mean3 <- 2.1720992063492064
+train_sd3 <- 1.201255528709618
+```
+
+# two groups
+
+```{r}
+set.seed(0)
+p <- 1538
+groups2 <- list(1:2, 3:1538)
+
+# generate Z matrix
+z2 <- matrix(0, nrow = p, ncol = length(groups2))
+for (i in 1:length(groups2)) {
+    z2[groups2[[i]], i] <- 1
+}
+
+cvfit2 <- cv.fwelnet(split3_X_valid2, split3_y_valid2, z2, nfolds = 5)
+plot(cvfit2)
+
+cvfit2$lambda.min
+cvfit2$lambda.1se
+
+split3_preds_test2 <- predict(cvfit2, split3_X_test) * train_sd3 + train_mean3  # s = lambda.1se
+
+# Calculate Mean Absolute Error (MAE)
+mae_value <- mae(actual = split3_y_test, predicted = split3_preds_test2)
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse_value <- rmse(actual = split3_y_test, predicted = split3_preds_test2)
+
+# Calculate R-squared
+r2_value <- summary(lm(split3_y_test ~ split3_preds_test2))$r.squared
+
+# Calculate correlation
+correlation_value <- cor(split3_y_test, split3_preds_test2)
+
+# Print the results
+print(paste("MAE:", mae_value))
+print(paste("RMSE:", rmse_value))
+print(paste("R2:", r2_value))
+print(paste("Correlation:", correlation_value))
+```
+
+# three groups
+
+```{r}
+set.seed(0)
+p <- 1538
+groups3 <- list(1:2, 3:770, 771:1538) # which features belong to which group
+
+# generate Z matrix
+z3 <- matrix(0, nrow = p, ncol = length(groups3))
+for (i in 1:length(groups)) {
+    z3[groups3[[i]], i] <- 1
+}
+
+cvfit3 <- cv.fwelnet(split3_X_valid2, split3_y_valid2, z3, nfolds = 5)
+plot(cvfit3)
+
+cvfit3$lambda.min
+cvfit3$lambda.1se
+
+split3_preds_test3 <- predict(cvfit3, split3_X_test) * train_sd3 + train_mean3  # s = lambda.1se
+
+# Calculate Mean Absolute Error (MAE)
+mae_value <- mae(actual = split3_y_test, predicted = split3_preds_test3)
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse_value <- rmse(actual = split3_y_test, predicted = split3_preds_test3)
+
+# Calculate R-squared
+r2_value <- summary(lm(split3_y_test ~ split3_preds_test3))$r.squared
+
+# Calculate correlation
+correlation_value <- cor(split3_y_test, split3_preds_test3)
+
+# Print the results
+print(paste("MAE:", mae_value))
+print(paste("RMSE:", rmse_value))
+print(paste("R2:", r2_value))
+print(paste("Correlation:", correlation_value))
+```
+
