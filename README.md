@@ -1,4 +1,4 @@
-# Knowledge Fusion of Large Language Models for Molecular Property Prediction
+# FusionLCLM: Knowledge Fusion of Large Language Models for Enhanced Molecular Property Prediction
 
 ![FusionLCLM Workflow](FusionLCLM_Workflow.png)
 
