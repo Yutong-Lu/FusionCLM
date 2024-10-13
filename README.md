@@ -3,25 +3,25 @@
 ![FusionCLM Workflow](FusionCLM_Workflow.png)
 
 ## Repository Structure
-This repository contains the implementation of the FusionLCLM project, organized as follows:
+This repository contains the implementation of the FusionCLM project, organized as follows:
 
 - `datasets/`: This folder contains the datasets used for training and evaluation.
-- `first-level/`: This folder contains three subfolders, each corresponding to a different LCLM:
+- `first-level/`: This folder contains three subfolders, each corresponding to a different CLM:
   - `ChemBERTa-2/`: [ChemBERTa-2 Manuscript](https://github.com/chemberta/chemberta-2)
   - `MoLFormer/`: [MolFormer Repository](https://github.com/IBM/molformer)
   - `MolBERT/`: [MolBERT Repository](https://github.com/BenevolentAI/MolBERT)
-- `second-level/`: This folder contains the code for various meta-model options used in the second level of the FusionLCLM framework.
+- `second-level/`: This folder contains the code for various meta-model options used in the second level of the FusionCLM framework.
 
 ## Usage
 To use this repository, follow the steps below:
 
 1. Clone this repository:
     ```sh
-    git clone https://github.com/yourusername/FusionLCLM.git
+    git clone https://github.com/yourusername/FusionCLM.git
     ```
 2. Navigate to the repository directory:
     ```sh
-    cd FusionLCLM
+    cd FusionCLM
     ```
     
 ### First-Level Models
