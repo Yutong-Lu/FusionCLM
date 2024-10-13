@@ -1,6 +1,6 @@
-# FusionLCLM: Knowledge Fusion of Large Language Models for Enhanced Molecular Property Prediction
+# FusionCLM: Enhanced Molecular Property Prediction via Knowledge Fusion of Chemical Language Models
 
-![FusionLCLM Workflow](FusionLCLM_Workflow.png)
+![FusionCLM Workflow](FusionCLM_Workflow.png)
 
 ## Repository Structure
 This repository contains the implementation of the FusionLCLM project, organized as follows:
