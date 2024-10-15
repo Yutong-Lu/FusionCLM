@@ -1,0 +1,5 @@
+"results[, 1]","MAE","RMSE","R2","Correlation"
+"ChemBERTa2",0.471,0.619,0.725,0.86
+"Molformer",0.455,0.606,0.737,0.867
+"Molbert",0.51,0.651,0.697,0.837
+"Fwelnet (2 Groups)",0.503,0.643,0.704,0.84

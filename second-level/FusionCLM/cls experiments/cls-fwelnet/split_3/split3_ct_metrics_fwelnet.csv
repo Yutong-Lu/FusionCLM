@@ -1,0 +1,5 @@
+" ","Accuracy","F1 Score","ROC-AUC","PR-AUC"
+"ChemBERTa2",0.972,0.8,0.996,0.952
+"Molformer",0.931,0.375,0.929,0.522
+"Molbert",0.917,0.143,0.913,0.442
+"Fwelnet (2 Groups)",0.979,0.842,0.996,0.952

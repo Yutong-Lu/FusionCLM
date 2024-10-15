@@ -1,0 +1,5 @@
+,MAE,RMSE,R2 Score,Correlation
+Chemberta2,0.467,0.619,0.734,0.868
+Molformer,0.46,0.614,0.738,0.868
+Molbert,0.516,0.66,0.698,0.836
+XGBoost,0.415,0.56,0.783,0.886

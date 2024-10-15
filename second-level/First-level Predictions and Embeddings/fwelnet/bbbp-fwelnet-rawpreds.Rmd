@@ -1,0 +1,353 @@
+---
+title: "feature-weighted_elasticNet"
+author: "Yutong Lu"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(fwelnet)
+library(tidyverse)
+library(Metrics)
+library(caret)       # for confusionMatrix (accuracy and F1 score)
+library(pROC)        # for roc and auc
+library(PRROC)       # for pr.curve
+```
+
+# load split-1 data
+
+```{r}
+# import data from split-1
+split1_X_valid2 <- as.matrix(read.csv('../split_1/processed_data/bbbp_X_ensemble_valid2_scaled_rawpreds.csv'))
+split1_y_valid2 <- as.matrix(read.csv('../split_1/processed_data/bbbp_y_ensemble_valid2.csv'))
+
+split1_X_test <- as.matrix(read.csv('../split_1/processed_data/bbbp_X_ensemble_test_scaled_rawpreds.csv'))
+split1_y_test <- as.matrix(read.csv('../split_1/processed_data/bbbp_y_ensemble_test.csv'))
+```
+
+# two groups
+
+```{r}
+set.seed(0)
+
+p <- 1923
+groups2 <- list(1:3, 4:1923)
+
+# generate Z matrix
+z2 <- matrix(0, nrow = p, ncol = length(groups2))
+for (i in 1:length(groups2)) {
+    z2[groups2[[i]], i] <- 1
+}
+
+cvfit2 <- cv.fwelnet(split1_X_valid2, split1_y_valid2, z2, nfolds = 5, family = "binomial")
+plot(cvfit2)
+
+cvfit2$lambda.min # value of lambda that gives minimum cross-validated error
+cvfit2$lambda.1se # largest value of lambda such that the CV error is within one standard error of the minimum
+
+split1_preds_test2 <- predict(cvfit2, split1_X_test, type = "response")
+
+# Calculate Accuracy and F1 Score
+conf_matrix <- confusionMatrix(table(
+  as.numeric((split1_preds_test2 >= 0.5)), 
+  split1_y_test))
+
+accuracy <- conf_matrix$overall['Accuracy']
+f1_score <- conf_matrix$byClass['F1']
+
+# Calculate ROC AUC
+roc_obj <- roc(as.vector(split1_y_test), as.vector(split1_preds_test2))
+roc_auc <- auc(roc_obj)
+
+# Calculate PR AUC
+pr_obj <- pr.curve(scores.class0 = split1_preds_test2, weights.class0 = split1_y_test,
+                   curve = TRUE)
+pr_auc <- pr_obj$auc.integral
+
+# Print results
+print(paste("Accuracy:", round(accuracy,3)))
+print(paste("F1 Score:", round(f1_score,3)))
+print(paste("ROC AUC:", round(roc_auc,3)))
+print(paste("PR AUC:", round(pr_auc,3)))
+```
+
+# four groups
+
+```{r}
+set.seed(0)
+
+p <- 1923
+groups4 <- list(1:3, 4:387, 388:1155, 1156:1923)  # which features belong to which group
+
+# generate Z matrix
+z4 <- matrix(0, nrow = p, ncol = length(groups4))
+for (i in 1:length(groups)) {
+    z4[groups4[[i]], i] <- 1
+}
+
+cvfit4 <- cv.fwelnet(split1_X_valid2, split1_y_valid2, z4, nfolds = 5, family = "binomial")
+plot(cvfit4)
+
+cvfit4$lambda.min # value of lambda that gives minimum cross-validated error
+cvfit4$lambda.1se # largest value of lambda such that the CV error is within one standard error of the min
+
+split1_preds_test4 <- predict(cvfit4, split1_X_test, type = "response")
+
+# Calculate Accuracy and F1 Score
+conf_matrix <- confusionMatrix(table(
+  as.numeric((split1_preds_test4 >= 0.5)), 
+  split1_y_test))
+
+accuracy <- conf_matrix$overall['Accuracy']
+f1_score <- conf_matrix$byClass['F1']
+
+# Calculate ROC AUC
+roc_obj <- roc(as.vector(split1_y_test), as.vector(split1_preds_test4))
+roc_auc <- auc(roc_obj)
+
+# Calculate PR AUC
+pr_obj <- pr.curve(scores.class0 = split1_preds_test4, weights.class0 = split1_y_test,
+                   curve = TRUE)
+pr_auc <- pr_obj$auc.integral
+
+# Print results
+print(paste("Accuracy:", round(accuracy,3)))
+print(paste("F1 Score:", round(f1_score,3)))
+print(paste("ROC AUC:", round(roc_auc,3)))
+print(paste("PR AUC:", round(pr_auc,3)))
+```
+
+# load split-2 data
+
+```{r}
+# import data from split-2
+split2_X_valid2 <- as.matrix(read.csv('../split_2/processed_data/bbbp_X_ensemble_valid2_scaled_rawpreds.csv'))
+split2_y_valid2 <- as.matrix(read.csv('../split_2/processed_data/bbbp_y_ensemble_valid2.csv'))
+
+split2_X_test <- as.matrix(read.csv('../split_2/processed_data/bbbp_X_ensemble_test_scaled_rawpreds.csv'))
+split2_y_test <- as.matrix(read.csv('../split_2/processed_data/bbbp_y_ensemble_test.csv'))
+```
+
+# two groups
+
+```{r}
+set.seed(0)
+
+
+p <- 1923
+groups2 <- list(1:3, 4:1923)
+
+# generate Z matrix
+z2 <- matrix(0, nrow = p, ncol = length(groups2))
+for (i in 1:length(groups2)) {
+    z2[groups2[[i]], i] <- 1
+}
+
+cvfit2 <- cv.fwelnet(split2_X_valid2, split2_y_valid2, z2, nfolds = 5, family = "binomial")
+plot(cvfit2)
+
+cvfit2$lambda.min
+cvfit2$lambda.1se
+
+split2_preds_test2 <- predict(cvfit2, split2_X_test, type = "response")
+
+# Calculate Accuracy and F1 Score
+conf_matrix <- confusionMatrix(table(
+  as.numeric((split2_preds_test2 >= 0.5)), 
+  split2_y_test))
+
+accuracy <- conf_matrix$overall['Accuracy']
+f1_score <- conf_matrix$byClass['F1']
+
+# Calculate ROC AUC
+roc_obj <- roc(as.vector(split2_y_test), as.vector(split2_preds_test2))
+roc_auc <- auc(roc_obj)
+
+# Calculate PR AUC
+pr_obj <- pr.curve(scores.class0 = split2_preds_test2, weights.class0 = split2_y_test,
+                   curve = TRUE)
+pr_auc <- pr_obj$auc.integral
+
+# Print results
+print(paste("Accuracy:", round(accuracy,3)))
+print(paste("F1 Score:", round(f1_score,3)))
+print(paste("ROC AUC:", round(roc_auc,3)))
+print(paste("PR AUC:", round(pr_auc,3)))
+```
+
+# four groups
+
+```{r}
+set.seed(0)
+
+p <- 1923
+groups4 <- list(1:3, 4:387, 388:1155, 1156:1923)  # which features belong to which group
+
+# generate Z matrix
+z4 <- matrix(0, nrow = p, ncol = length(groups4))
+for (i in 1:length(groups)) {
+    z4[groups4[[i]], i] <- 1
+}
+
+cvfit4 <- cv.fwelnet(split2_X_valid2, split2_y_valid2, z4, nfolds = 5, family = "binomial")
+plot(cvfit4)
+
+cvfit4$lambda.min
+cvfit4$lambda.1se
+
+split2_preds_test4 <- predict(cvfit4, split2_X_test, type = "response")
+
+# Calculate Accuracy and F1 Score
+conf_matrix <- confusionMatrix(table(
+  as.numeric((split2_preds_test4 >= 0.5)), 
+  split2_y_test))
+
+accuracy <- conf_matrix$overall['Accuracy']
+f1_score <- conf_matrix$byClass['F1']
+
+# Calculate ROC AUC
+roc_obj <- roc(as.vector(split2_y_test), as.vector(split2_preds_test4))
+roc_auc <- auc(roc_obj)
+
+# Calculate PR AUC
+pr_obj <- pr.curve(scores.class0 = split2_preds_test4, weights.class0 = split2_y_test,
+                   curve = TRUE)
+pr_auc <- pr_obj$auc.integral
+
+# Print results
+print(paste("Accuracy:", round(accuracy,3)))
+print(paste("F1 Score:", round(f1_score,3)))
+print(paste("ROC AUC:", round(roc_auc,3)))
+print(paste("PR AUC:", round(pr_auc,3)))
+```
+
+# load split-3 data
+
+```{r}
+# Load the training set of meta-model
+split3_X_valid2 <- as.matrix(read.csv('../split_3/processed_data/bbbp_X_ensemble_valid2_scaled_rawpreds.csv'))
+split3_y_valid2 <- as.matrix(read.csv('../split_3/processed_data/bbbp_y_ensemble_valid2.csv'))
+
+split3_X_test <- as.matrix(read.csv('../split_3/processed_data/bbbp_X_ensemble_test_scaled_rawpreds.csv'))
+split3_y_test <- as.matrix(read.csv('../split_3/processed_data/bbbp_y_ensemble_test.csv'))
+```
+
+# two groups
+
+```{r}
+set.seed(0)
+
+p <- 1923
+groups2 <- list(1:3, 4:1923)
+
+# generate Z matrix
+z2 <- matrix(0, nrow = p, ncol = length(groups2))
+for (i in 1:length(groups2)) {
+    z2[groups2[[i]], i] <- 1
+}
+
+cvfit2 <- cv.fwelnet(split3_X_valid2, split3_y_valid2, z2, nfolds = 5, family = "binomial")
+plot(cvfit2)
+
+cvfit2$lambda.min
+cvfit2$lambda.1se
+
+split3_preds_test2 <- predict(cvfit2, split3_X_test, type = "response")
+
+# Calculate Accuracy and F1 Score
+conf_matrix <- confusionMatrix(table(
+  as.numeric((split3_preds_test2 >= 0.5)), 
+  split3_y_test))
+
+accuracy <- conf_matrix$overall['Accuracy']
+f1_score <- conf_matrix$byClass['F1']
+
+# Calculate ROC AUC
+roc_obj <- roc(as.vector(split3_y_test), as.vector(split3_preds_test2))
+roc_auc <- auc(roc_obj)
+
+# Calculate PR AUC
+pr_obj <- pr.curve(scores.class0 = split3_preds_test2, weights.class0 = split3_y_test,
+                   curve = TRUE)
+pr_auc <- pr_obj$auc.integral
+
+# Print results
+print(paste("Accuracy:", round(accuracy,3)))
+print(paste("F1 Score:", round(f1_score,3)))
+print(paste("ROC AUC:", round(roc_auc,3)))
+print(paste("PR AUC:", round(pr_auc,3)))
+```
+
+# four groups
+
+```{r}
+set.seed(0)
+
+p <- 1923
+groups4 <- list(1:3, 4:387, 388:1155, 1156:1923)  # which features belong to which group
+
+# generate Z matrix
+z4 <- matrix(0, nrow = p, ncol = length(groups4))
+for (i in 1:length(groups)) {
+    z4[groups4[[i]], i] <- 1
+}
+
+cvfit4 <- cv.fwelnet(split3_X_valid2, split3_y_valid2, z4, nfolds = 5, family = "binomial")
+plot(cvfit4)
+
+cvfit4$lambda.min
+cvfit4$lambda.1se
+
+split3_preds_test4 <- predict(cvfit4, split3_X_test, type = "response")
+
+# Calculate Accuracy and F1 Score
+conf_matrix <- confusionMatrix(table(
+  as.numeric((split3_preds_test4 >= 0.5)), 
+  split3_y_test))
+
+accuracy <- conf_matrix$overall['Accuracy']
+f1_score <- conf_matrix$byClass['F1']
+
+# Calculate ROC AUC
+roc_obj <- roc(as.vector(split3_y_test), as.vector(split3_preds_test4))
+roc_auc <- auc(roc_obj)
+
+# Calculate PR AUC
+pr_obj <- pr.curve(scores.class0 = split3_preds_test4, weights.class0 = split3_y_test,
+                   curve = TRUE)
+pr_auc <- pr_obj$auc.integral
+
+# Print results
+print(paste("Accuracy:", round(accuracy,3)))
+print(paste("F1 Score:", round(f1_score,3)))
+print(paste("ROC AUC:", round(roc_auc,3)))
+print(paste("PR AUC:", round(pr_auc,3)))
+```
+
+```{r}
+# Create data frames for each split
+split1_pred_vs_true <- data.frame(
+  split1_pred_2 = split1_preds_test2,
+  split1_pred_4 = split1_preds_test4,
+  `split1_true` = split1_y_test
+)
+
+split2_pred_vs_true <- data.frame(
+  split2_pred_2 = split2_preds_test2,
+  split2_pred_4 = split2_preds_test4,
+  `split2_true` = split2_y_test
+)
+
+split3_pred_vs_true <- data.frame(
+  split3_pred_2 = split3_preds_test2,
+  split3_pred_4 = split3_preds_test4,
+  `split3_true` = split3_y_test
+)
+
+# Save each data frame as a separate CSV file
+write.csv(split1_pred_vs_true, file = "./split1_bbbp_pred_vs_true.csv", row.names = FALSE)
+write.csv(split2_pred_vs_true, file = "./split2_bbbp_pred_vs_true.csv", row.names = FALSE)
+write.csv(split3_pred_vs_true, file = "./split3_bbbp_pred_vs_true.csv", row.names = FALSE)
+```
+

@@ -1,0 +1,246 @@
+---
+title: "feature-weighted_elasticNet"
+author: "Yutong Lu"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(fwelnet)
+library(tidyverse)
+library(Metrics)
+```
+
+# load split_3 data
+
+```{r}
+# Define mean and standard deviation from training set
+train_mean <- -3.0955443786982246
+train_sd <- 2.121246879189704
+
+# Valid 2
+
+# Load the raw predictions
+chemberta2_pred <- read.csv('./processed_data/delaney_chemberta_pred.csv')
+molformer_pred <- read.csv('./processed_data/delaney_molformer_pred.csv')
+molbert_pred <- read.csv('./processed_data/delaney_molbert_pred.csv')
+
+# Load the scaled feature datasets for auxiliary models
+chemberta_X_scaled <- as.matrix(read.csv('./processed_data/delaney_chemberta_X.csv'))
+molformer_X_scaled <- as.matrix(read.csv('./processed_data/delaney_molformer_X.csv'))
+molbert_X_scaled <- as.matrix(read.csv('./processed_data/delaney_molbert_X.csv'))
+
+# Load the target (y) datasets
+chemberta_y_residual <- as.matrix(read.csv('./processed_data/delaney_chemberta_y.csv'))
+molformer_y_residual <- as.matrix(read.csv('./processed_data/delaney_molformer_y.csv'))
+molbert_y_residual <- as.matrix(read.csv('./processed_data/delaney_molbert_y.csv'))
+
+y_ensemble_valid2 <- as.matrix(read.csv('./processed_data/delaney_y_ensemble_valid2.csv'))
+
+X_ensemble_valid2 <- as.matrix(cbind(chemberta_y_residual, molformer_y_residual, molbert_y_residual,
+                           chemberta2_pred, molformer_pred, molbert_pred))
+
+# Test
+
+# Load raw predictions
+chemberta2_pred_test <- read.csv('./processed_data/delaney_chemberta_pred_test.csv')
+molformer_pred_test <- read.csv('./processed_data/delaney_molformer_pred_test.csv')
+molbert_pred_test <- read.csv('./processed_data/delaney_molbert_pred_test.csv')
+
+# Load the scaled test datasets
+chemberta_X_test_scaled <- as.matrix(read.csv('./processed_data/delaney_chemberta_X_test.csv'))
+molformer_X_test_scaled <- as.matrix(read.csv('./processed_data/delaney_molformer_X_test.csv'))
+molbert_X_test_scaled <- as.matrix(read.csv('./processed_data/delaney_molbert_X_test.csv'))
+
+# Optional for eval
+y_ensemble_test <- as.matrix(read.csv('./processed_data/delaney_y_ensemble_test.csv'))
+```
+
+# auxiliary model for residual with two groups
+
+```{r}
+set.seed(0)
+
+# Create lists to store results
+cvfits <- list()
+test_predictions <- list()
+lambda_min <- list()
+lambda_1se <- list()
+
+# List of model names and corresponding data
+model_names <- c("chemberta", "molformer", "molbert")
+X_scaled_list <- list(chemberta_X_scaled, molformer_X_scaled, molbert_X_scaled)
+y_residual_list <- list(chemberta_y_residual, molformer_y_residual, molbert_y_residual)
+X_test_scaled_list <- list(chemberta_X_test_scaled, molformer_X_test_scaled, molbert_X_test_scaled)
+group2s <- list(list(1, 2:385), list(1, 2:769), list(1, 2:769))
+z2s <- list(matrix(0, 385, ncol = 2), matrix(0, 769, ncol = 2), matrix(0, 769, ncol = 2))
+  
+# Loop through models
+for (i in 1:length(model_names)) {
+  model_name <- model_names[i]
+  group2 <- group2s[[i]]
+  z2 <- z2s[[i]]
+  
+  for (k in 1:length(group2)) {
+    z2[group2[[k]], k] <- 1
+  }
+  
+  # Fit the model using cross-validation
+  cvfit <- cv.fwelnet(X_scaled_list[[i]], y_residual_list[[i]], z2, nfolds = 5)
+  
+  # Store the cross-validation fit and lambda values
+  cvfits[[model_name]] <- cvfit
+  lambda_min[[model_name]] <- cvfit$lambda.min
+  lambda_1se[[model_name]] <- cvfit$lambda.1se
+  
+  # Plot the cross-validation fit
+  # plot(cvfit, main = paste(model_name, "CV fit"))
+  
+  # Predict on the test set
+  test_pred <- predict(cvfit, X_test_scaled_list[[i]])
+  test_predictions[[model_name]] <- test_pred
+}
+
+
+X_ensemble_test <- as.matrix(cbind(test_predictions[["chemberta"]], 
+                         test_predictions[["molformer"]],
+                         test_predictions[["molbert"]],
+                         chemberta2_pred_test, molformer_pred_test, molbert_pred_test))
+```
+
+```{r}
+train_scaler <- function(train_data) {
+  # Calculate the mean and standard deviation for each column in training data
+  data_mean <- apply(train_data, 2, mean)
+  data_sd <- apply(train_data, 2, sd)
+  
+  # Return the scaler as a list of mean and standard deviation
+  scaler <- list(mean = data_mean, sd = data_sd)
+  return(scaler)
+}
+
+# Function to scale data using the trained scaler (transform)
+scale_data <- function(data, scaler) {
+  # Scale the data by subtracting the mean and dividing by the standard deviation
+  scaled_data <- sweep(data, 2, scaler$mean, "-")
+  scaled_data <- sweep(scaled_data, 2, scaler$sd, "/")
+  
+  return(scaled_data)
+}
+
+scaler <- train_scaler(X_ensemble_valid2)
+X_ensemble_valid2_scaled <- scale_data(X_ensemble_valid2, scaler)
+X_ensemble_test_scaled <- scale_data(X_ensemble_test, scaler)
+```
+
+# two-group lasso as second level model
+
+```{r}
+set.seed(0)
+
+p22 <- 6
+groups22 <- list(1:3, 4:6)
+
+# generate Z matrix
+z22 <- matrix(0, nrow = p22, ncol = length(groups22))
+
+for (i in 1:length(groups22)) {
+    z22[groups22[[i]], i] <- 1
+}
+
+cvfit22 <- cv.fwelnet(X_ensemble_valid2_scaled, y_ensemble_valid2, z22, nfolds = 5)
+plot(cvfit22)
+
+cvfit22$lambda.min # value of lambda that gives minimum cross-validated error
+cvfit22$lambda.1se # largest value of lambda such that the CV error is within one standard error of the minimum
+
+pred_test22 <- predict(cvfit22, X_ensemble_test_scaled) * train_sd + train_mean  # s = lambda.1se
+
+# Define manual metric calculation functions
+manual_rmse <- function(actual, predicted) {
+  sqrt(mean((actual - predicted)^2))
+}
+
+manual_mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+manual_r2 <- function(actual, predicted) {
+  ss_res <- sum((actual - predicted)^2)
+  ss_tot <- sum((actual - mean(actual))^2)
+  1 - (ss_res / ss_tot)
+}
+
+# Calculate Mean Absolute Error (MAE) manually
+mae_value <- manual_mae(actual = y_ensemble_test, predicted = pred_test22)
+
+# Calculate Root Mean Squared Error (RMSE) manually
+rmse_value <- manual_rmse(actual = y_ensemble_test, predicted = pred_test22)
+
+# Calculate R-squared manually
+r2_value <- manual_r2(actual = y_ensemble_test, predicted = pred_test22)
+
+# Calculate correlation
+correlation_value <- cor(y_ensemble_test, pred_test22)
+
+# Print the results
+print(paste("MAE:", round(mae_value,3)))
+print(paste("RMSE:", round(rmse_value,3)))
+print(paste("R2:", round(r2_value,3)))
+print(paste("Correlation:", round(correlation_value,3)))
+```
+
+```{r}
+# re-standardize the predictions to original scale
+chemberta2_pred_test_raw <- chemberta2_pred_test$pred_z * train_sd + train_mean
+molformer_pred_test_raw <- molformer_pred_test$pred_z * train_sd + train_mean
+molbert_pred_test_raw <- molbert_pred_test$pred_z * train_sd + train_mean
+
+# Calculate metrics for chemberta2
+rmse_chemberta2 <- manual_rmse(y_ensemble_test, chemberta2_pred_test_raw)
+mae_chemberta2 <- manual_mae(y_ensemble_test, chemberta2_pred_test_raw)
+r2_chemberta2 <- manual_r2(y_ensemble_test, chemberta2_pred_test_raw)
+pearson_chemberta2 <- cor(y_ensemble_test, chemberta2_pred_test_raw)
+
+# Calculate metrics for molformer
+rmse_molformer <- manual_rmse(y_ensemble_test, molformer_pred_test_raw)
+mae_molformer <- manual_mae(y_ensemble_test, molformer_pred_test_raw)
+r2_molformer <- manual_r2(y_ensemble_test, molformer_pred_test_raw)
+pearson_molformer <- cor(y_ensemble_test, molformer_pred_test_raw)
+
+# Calculate metrics for molbert
+rmse_molbert <- manual_rmse(y_ensemble_test, molbert_pred_test_raw)
+mae_molbert <- manual_mae(y_ensemble_test, molbert_pred_test_raw)
+r2_molbert <- manual_r2(y_ensemble_test, molbert_pred_test_raw)
+pearson_molbert <- cor(y_ensemble_test, molbert_pred_test_raw)
+```
+
+```{r}
+# Create a dataframe for all the values
+results <- data.frame(
+  Model = c("ChemBERTa2", "Molformer", "Molbert", "Fwelnet (2 Groups)"),
+  MAE = c(mae_chemberta2, mae_molformer, mae_molbert, round(mae_value, 3)),
+  RMSE = c(rmse_chemberta2, rmse_molformer, rmse_molbert, round(rmse_value, 3)),
+  R2 = c(r2_chemberta2, r2_molformer, r2_molbert, round(r2_value, 3)),
+  Correlation = c(pearson_chemberta2, pearson_molformer, pearson_molbert, round(correlation_value, 3))
+)
+
+results <- cbind(results[,1], round(results[,2:5], 3))
+
+# Save the results to CSV
+write.csv(results, file = "./split3_delaney_metrics_fwelnet.csv", row.names = FALSE)
+```
+
+```{r}
+# pred_vs_true <- data.frame(
+#   pred = pred_test22,
+#   chemberta_pred = chemberta2_pred_test_raw,
+#   molformer_pred = molformer_pred_test_raw,
+#   molbert_pred = molbert_pred_test_raw,
+#   true = y_ensemble_test
+# )
+# 
+# write.csv(pred_vs_true, file = "./split3_delaney_results_fwelnet.csv", row.names = FALSE)
+```
+

@@ -1,0 +1,314 @@
+---
+title: "feature-weighted_elasticNet"
+author: "Yutong Lu"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(fwelnet)
+library(tidyverse)
+library(MLmetrics)
+library(Metrics)
+library(caret)       # for confusionMatrix (accuracy and F1 score)
+library(pROC)        # for roc and auc
+library(PRROC)       # for pr.curve
+```
+
+# load 2nd validation set data
+
+```{r}
+# Valid 2
+
+# Load the raw predictions
+chemberta2_prob <- read.csv('./processed_data/bbbp_chemberta_prob.csv')
+molformer_prob <- read.csv('./processed_data/bbbp_molformer_prob.csv')
+molbert_prob <- read.csv('./processed_data/bbbp_molbert_prob.csv')
+
+# Load the scaled feature datasets for auxiliary models
+chemberta_X_scaled <- as.matrix(read.csv('./processed_data/bbbp_chemberta_X.csv'))
+molformer_X_scaled <- as.matrix(read.csv('./processed_data/bbbp_molformer_X.csv'))
+molbert_X_scaled <- as.matrix(read.csv('./processed_data/bbbp_molbert_X.csv'))
+
+# Load the target (y) datasets
+chemberta_y_bce <- as.matrix(read.csv('./processed_data/bbbp_chemberta_y.csv'))
+molformer_y_bce <- as.matrix(read.csv('./processed_data/bbbp_molformer_y.csv'))
+molbert_y_bce <- as.matrix(read.csv('./processed_data/bbbp_molbert_y.csv'))
+
+y_ensemble_valid2 <- as.matrix(read.csv('./processed_data/bbbp_y_ensemble_valid2.csv'))
+
+X_ensemble_valid2 <- as.matrix(cbind(chemberta_y_bce, molformer_y_bce, molbert_y_bce,
+                           chemberta2_prob, molformer_prob, molbert_prob))
+
+# Test
+
+# Load raw predictions
+chemberta2_prob_test <- read.csv('./processed_data/bbbp_chemberta_prob_test.csv')
+molformer_prob_test <- read.csv('./processed_data/bbbp_molformer_prob_test.csv')
+molbert_prob_test <- read.csv('./processed_data/bbbp_molbert_prob_test.csv')
+
+# Load the scaled test datasets
+chemberta_X_test_scaled <- as.matrix(read.csv('./processed_data/bbbp_chemberta_X_test.csv'))
+molformer_X_test_scaled <- as.matrix(read.csv('./processed_data/bbbp_molformer_X_test.csv'))
+molbert_X_test_scaled <- as.matrix(read.csv('./processed_data/bbbp_molbert_X_test.csv'))
+
+# Optional for eval
+y_ensemble_test <- read.csv('./processed_data/bbbp_y_ensemble_test.csv')
+```
+
+# auxiliary model for BCE with two groups
+
+```{r}
+set.seed(0)
+
+# Create lists to store results
+cvfits <- list()
+test_predictions <- list()
+lambda_min <- list()
+lambda_1se <- list()
+
+# List of model names and corresponding data
+model_names <- c("chemberta", "molformer", "molbert")
+X_scaled_list <- list(chemberta_X_scaled, molformer_X_scaled, molbert_X_scaled)
+y_bce_list <- list(chemberta_y_bce, molformer_y_bce, molbert_y_bce)
+X_test_scaled_list <- list(chemberta_X_test_scaled, molformer_X_test_scaled, molbert_X_test_scaled)
+group2s <- list(list(1, 2:385), list(1, 2:769), list(1, 2:769))
+z2s <- list(matrix(0, 385, ncol = 2), matrix(0, 769, ncol = 2), matrix(0, 769, ncol = 2))
+  
+# Loop through models
+for (i in 1:length(model_names)) {
+  model_name <- model_names[i]
+  group2 <- group2s[[i]]
+  z2 <- z2s[[i]]
+  
+  for (k in 1:length(group2)) {
+    z2[group2[[k]], k] <- 1
+  }
+  
+  # Fit the model using cross-validation
+  cvfit <- cv.fwelnet(X_scaled_list[[i]], y_bce_list[[i]], z2, nfolds = 5)
+  
+  # Store the cross-validation fit and lambda values
+  cvfits[[model_name]] <- cvfit
+  lambda_min[[model_name]] <- cvfit$lambda.min
+  lambda_1se[[model_name]] <- cvfit$lambda.1se
+  
+  # Plot the cross-validation fit
+  # plot(cvfit, main = paste(model_name, "CV fit"))
+  
+  # Predict on the test set
+  test_pred <- predict(cvfit, X_test_scaled_list[[i]])
+  test_predictions[[model_name]] <- test_pred
+}
+
+
+X_ensemble_test <- as.matrix(cbind(test_predictions[["chemberta"]], 
+                         test_predictions[["molformer"]],
+                         test_predictions[["molbert"]],
+                         chemberta2_prob_test, molformer_prob_test, molbert_prob_test))
+```
+
+```{r}
+train_scaler <- function(train_data) {
+  # Calculate the mean and standard deviation for each column in training data
+  data_mean <- apply(train_data, 2, mean)
+  data_sd <- apply(train_data, 2, sd)
+  
+  # Return the scaler as a list of mean and standard deviation
+  scaler <- list(mean = data_mean, sd = data_sd)
+  return(scaler)
+}
+
+# Function to scale data using the trained scaler (transform)
+scale_data <- function(data, scaler) {
+  # Scale the data by subtracting the mean and dividing by the standard deviation
+  scaled_data <- sweep(data, 2, scaler$mean, "-")
+  scaled_data <- sweep(scaled_data, 2, scaler$sd, "/")
+  
+  return(scaled_data)
+}
+
+scaler <- train_scaler(X_ensemble_valid2)
+X_ensemble_valid2_scaled <- scale_data(X_ensemble_valid2, scaler)
+X_ensemble_test_scaled <- scale_data(X_ensemble_test, scaler)
+```
+
+# second level model with two groups
+
+```{r}
+set.seed(0)
+
+p22 <- 6
+groups22 <- list(1:3, 4:6)  # which features belong to which group
+
+# generate Z matrix
+z22 <- matrix(0, nrow = p22, ncol = length(groups22))
+
+for (i in 1:length(groups)) {
+    z22[groups22[[i]], i] <- 1
+}
+
+cvfit22 <- cv.fwelnet(X_ensemble_valid2_scaled, y_ensemble_valid2, z22, nfolds = 5, family = "binomial")
+plot(cvfit22)
+
+cvfit22$lambda.min # value of lambda that gives minimum cross-validated error
+cvfit22$lambda.1se # largest value of lambda such that the CV error is within one standard error of the min
+
+preds_test22 <- predict(cvfit22, X_ensemble_test_scaled, type = "response")
+
+# Create confusion matrix components manually
+pred_labels <- as.numeric(preds_test22 >= 0.5)
+true_labels <- as.numeric(as.matrix(y_ensemble_test))
+
+# Calculate True Positives (TP), False Positives (FP), True Negatives (TN), and False Negatives (FN)
+TP <- sum(pred_labels == 1 & true_labels == 1)
+FP <- sum(pred_labels == 1 & true_labels == 0)
+TN <- sum(pred_labels == 0 & true_labels == 0)
+FN <- sum(pred_labels == 0 & true_labels == 1)
+
+# Calculate Accuracy
+accuracy <- (TP + TN) / (TP + FP + TN + FN)
+
+# Calculate Precision and Recall
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)
+
+# Calculate F1 Score
+f1_score <- 2 * (precision * recall) / (precision + recall)
+
+# Calculate ROC AUC
+roc_obj <- roc(as.vector(as.matrix(y_ensemble_test)), as.vector(preds_test22))
+roc_auc <- auc(roc_obj)
+
+# Calculate PR AUC
+pr_obj <- pr.curve(scores.class0 = preds_test22, weights.class0 = as.matrix(y_ensemble_test),
+                   curve = TRUE)
+pr_auc <- pr_obj$auc.integral
+
+# Print results
+print(paste("Accuracy:", round(accuracy,3)))
+print(paste("F1 Score:", round(f1_score,3)))
+print(paste("ROC AUC:", round(roc_auc,3)))
+print(paste("PR AUC:", round(pr_auc,3)))
+```
+
+```{r}
+# Convert probabilities to binary (0.5 threshold)
+threshold <- 0.5
+chemberta2_pred_test <- ifelse(chemberta2_prob_test$chemberta2 >= threshold, 1, 0)
+molformer_pred_test <- ifelse(molformer_prob_test$molformer >= threshold, 1, 0)
+molbert_pred_test <- ifelse(molbert_prob_test$molbert >= threshold, 1, 0)
+
+# Calculate accuracy
+chemberta2_accuracy <- sum(chemberta2_pred_test == y_ensemble_test) / length(y_ensemble_test$p_np)
+molformer_accuracy <- sum(molformer_pred_test == y_ensemble_test) / length(y_ensemble_test$p_np)
+molbert_accuracy <- sum(molbert_pred_test == y_ensemble_test) / length(y_ensemble_test$p_np)
+
+# Calculate ROC-AUC
+chemberta2_roc <- roc(y_ensemble_test$p_np, chemberta2_prob_test$chemberta2)
+molformer_roc <- roc(y_ensemble_test$p_np, molformer_prob_test$molformer)
+molbert_roc <- roc(y_ensemble_test$p_np, molbert_prob_test$molbert)
+
+chemberta2_roc_auc <- auc(chemberta2_roc)
+molformer_roc_auc <- auc(molformer_roc)
+molbert_roc_auc <- auc(molbert_roc)
+
+# Calculate PR-AUC
+chemberta2_pr <- pr.curve(scores.class0 = chemberta2_prob_test$chemberta2, weights.class0 = y_ensemble_test$p_np == 1)
+molformer_pr <- pr.curve(scores.class0 = molformer_prob_test$molformer, weights.class0 = y_ensemble_test$p_np == 1)
+molbert_pr <- pr.curve(scores.class0 = molbert_prob_test$molbert, weights.class0 = y_ensemble_test$p_np == 1)
+
+chemberta2_pr_auc <- chemberta2_pr$auc.integral
+molformer_pr_auc <- molformer_pr$auc.integral
+molbert_pr_auc <- molbert_pr$auc.integral
+```
+
+```{r}
+# Assuming y_ensemble_test$p_np contains the true labels
+# and chemberta2_pred_test, molformer_pred_test, molbert_pred_test are the predicted labels.
+
+# Confusion matrices for each model
+conf_matrix_chemberta2 <- table(y_ensemble_test$p_np, chemberta2_pred_test)
+conf_matrix_molformer <- table(y_ensemble_test$p_np, molformer_pred_test)
+conf_matrix_molbert <- table(y_ensemble_test$p_np, molbert_pred_test)
+
+# Extract true positives (TP), false positives (FP), and false negatives (FN)
+# For binary classification: positive class = 1, negative class = 0
+
+# chemberta2 model
+TP_chemberta2 <- conf_matrix_chemberta2[2, 2] # True positives
+FP_chemberta2 <- conf_matrix_chemberta2[1, 2] # False positives
+FN_chemberta2 <- conf_matrix_chemberta2[2, 1] # False negatives
+
+# molformer model
+TP_molformer <- conf_matrix_molformer[2, 2]
+FP_molformer <- conf_matrix_molformer[1, 2]
+FN_molformer <- conf_matrix_molformer[2, 1]
+
+# molbert model
+TP_molbert <- conf_matrix_molbert[2, 2]
+FP_molbert <- conf_matrix_molbert[1, 2]
+FN_molbert <- conf_matrix_molbert[2, 1]
+
+# Calculate precision and recall for each model
+
+# chemberta2 model
+precision_chemberta2 <- TP_chemberta2 / (TP_chemberta2 + FP_chemberta2)
+recall_chemberta2 <- TP_chemberta2 / (TP_chemberta2 + FN_chemberta2)
+
+# molformer model
+precision_molformer <- TP_molformer / (TP_molformer + FP_molformer)
+recall_molformer <- TP_molformer / (TP_molformer + FN_molformer)
+
+# molbert model
+precision_molbert <- TP_molbert / (TP_molbert + FP_molbert)
+recall_molbert <- TP_molbert / (TP_molbert + FN_molbert)
+
+# Calculate F1 score for each model
+
+# F1 score for chemberta2
+chemberta2_f1 <- 2 * (precision_chemberta2 * recall_chemberta2) / (precision_chemberta2 + recall_chemberta2)
+
+# F1 score for molformer
+molformer_f1 <- 2 * (precision_molformer * recall_molformer) / (precision_molformer + recall_molformer)
+
+# F1 score for molbert
+molbert_f1 <- 2 * (precision_molbert * recall_molbert) / (precision_molbert + recall_molbert)
+```
+
+```{r}
+# Create a dataframe for all the values
+results <- data.frame(
+  Model = c("ChemBERTa2", "Molformer", "Molbert", "Fwelnet (2 Groups)"),
+  Accuracy = c(chemberta2_accuracy, molformer_accuracy, molbert_accuracy, round(accuracy, 3)),
+  `F1 Score` = c(chemberta2_f1, molformer_f1, molbert_f1, round(f1_score, 3)),
+  `ROC-AUC` = c(chemberta2_roc_auc, molformer_roc_auc, molbert_roc_auc, round(roc_auc, 3)),
+  `PR-AUC` = c(chemberta2_pr_auc, molformer_pr_auc, molbert_pr_auc, round(pr_auc, 3))
+)
+
+results <- cbind(results[,1], round(results[,2:5], 3))
+
+colnames(results) <- c(' ', 'Accuracy', 'F1 Score', 'ROC-AUC', 'PR-AUC')
+
+# Save the results to CSV
+write.csv(results, file = "./split2_bbbp_metrics_fwelnet.csv", row.names = FALSE)
+```
+
+```{r}
+pred_vs_true <- data.frame(
+  pred = preds_test22,
+  chemberta_pred = chemberta2_prob_test$chemberta2,
+  molformer_pred = molformer_prob_test$molformer,
+  molbert_pred = molbert_prob_test$molbert,
+  true = y_ensemble_test$p_np
+)
+
+write.csv(pred_vs_true, file = "./split2_bbbp_results_fwelnet.csv", row.names = FALSE)
+```
+
+
+
+
+
+

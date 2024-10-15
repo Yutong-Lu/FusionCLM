@@ -1,0 +1,5 @@
+,MAE,RMSE,R2 Score,Correlation
+Chemberta2,0.476,0.635,0.898,0.95
+Molformer,0.501,0.675,0.885,0.955
+Molbert,0.492,0.644,0.896,0.946
+Random Forest,0.373,0.513,0.934,0.968

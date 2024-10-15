@@ -1,0 +1,5 @@
+,Accuracy,F1 Score,ROC-AUC,PR-AUC
+Chemberta2,0.98,0.842,0.989,0.897
+Molformer,0.899,0.348,0.841,0.447
+Molbert,0.926,0.353,0.88,0.41
+Neural Network,0.973,0.8,0.993,0.913

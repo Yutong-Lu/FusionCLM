@@ -1,0 +1,5 @@
+,MAE,RMSE,R2 Score,Correlation
+Chemberta2,0.467,0.619,0.734,0.868
+Molformer,0.46,0.614,0.738,0.868
+Molbert,0.516,0.66,0.698,0.836
+Elastic Net,0.412,0.555,0.786,0.887

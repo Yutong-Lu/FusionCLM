@@ -1,0 +1,5 @@
+,Accuracy,F1 Score,ROC-AUC,PR-AUC
+Chemberta2,0.973,0.8,0.996,0.954
+Molformer,0.933,0.375,0.927,0.534
+Molbert,0.917,0.143,0.913,0.467
+XGBoost,0.945,0.714,0.995,0.929

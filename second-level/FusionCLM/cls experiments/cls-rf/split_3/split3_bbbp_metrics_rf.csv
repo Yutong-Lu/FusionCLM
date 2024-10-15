@@ -1,0 +1,5 @@
+,Accuracy,F1 Score,ROC-AUC,PR-AUC
+Chemberta2,0.829,0.884,0.949,0.988
+Molformer,0.877,0.925,0.879,0.966
+Molbert,0.907,0.943,0.951,0.989
+Random Forest,0.877,0.924,0.937,0.982

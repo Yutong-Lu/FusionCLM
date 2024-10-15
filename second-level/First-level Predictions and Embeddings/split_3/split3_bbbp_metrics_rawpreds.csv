@@ -1,0 +1,12 @@
+,Accuracy,F1 Score,ROC-AUC,PR-AUC
+Chemberta2,0.829,0.884,0.949,0.988
+Molformer,0.877,0.925,0.879,0.966
+Molbert,0.907,0.943,0.951,0.989
+LASSO,0.892,0.933,0.955,0.99
+Group Lasso (Two Groups),0.858,0.907,0.923,0.966
+Group Lasso (Four Groups),0.858,0.907,0.922,0.967
+Elastic Net,0.902,0.939,0.938,0.983
+SVM,0.902,0.94,0.934,0.983
+Random Forest,0.917,0.949,0.951,0.988
+XGBoost,0.877,0.924,0.936,0.985
+Neural Network,0.877,0.923,0.92,0.972
