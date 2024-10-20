@@ -16,7 +16,7 @@ This repository contains the implementation of the FusionCLM project, organized 
   - `FusionCLM/` is the folder for the **main method and results**, which contains subfolders for:
     -  Task: classification or regression,
         - Choice of model for auxiliary and second-level meta-models: lasso, group lasso, elastic net, feature-weighted elastic net, SVM, random forest, XGBoost, Neural Network,
-        - Data: the data split used, 1-3.
+          -  Data: the data split used, 1-3.
 
 ## Usage
 To use this repository, follow the steps below:
